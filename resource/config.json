@@ -1,0 +1,21 @@
+{
+ 	"LogConfig": {
+ 		"LogFile": "/var/log/iacuity/statservice.log",
+ 		"LogLevel": 2
+ 	},
+ 	"ServerConfig": {
+ 		"Host": "",
+ 		"Port": 4040
+ 	},
+ 	"Servlets": [{
+ 		"Name": "statservice",
+ 		"Path": "/iacuity/stat"
+ 	}],
+ 	"DBConfig": {
+ 		"Hostname": "localhost",
+ 		"Port": 3306,
+ 		"Username": "*****",
+ 		"Password": "*****",
+ 		"Database": "statdb"
+ 	}
+ }
