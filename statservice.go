@@ -2,11 +2,13 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/llog"
 
@@ -15,9 +17,14 @@ import (
 	"github.com/statservice/writer"
 )
 
+const (
+	MAX_CHANNEL_BUFFER = 100000
+)
+
 var (
 	config   data.Config
 	msqlConn *sql.DB
+	msgChan  chan []data.Pair
 
 	writers = []writer.IWritter{
 		&writer.FileWriter{},
@@ -53,35 +60,71 @@ func init() {
 	for _, servlet := range config.Servlets {
 		switch *servlet.Name {
 		case "statservice":
-			http.HandleFunc(*servlet.Path, handleStat)
+			http.HandleFunc(*servlet.Path, handleRequest)
 		}
 	}
 
-	//	var reqObject interface{}
+	msgChan = make(chan []data.Pair, MAX_CHANNEL_BUFFER)
+	updateStat()
+}
 
-	//	switch r.Method {
-	//	case "GET":
-	//		query := r.FormValue("query")
-	//		logger.Debug("request data is: %s", query)
-	//		if !util.IsBlank(query) {
-	//			err := json.Unmarshal([]byte(query), &reqObject)
-	//			if nil != err {
-	//				logger.Error("Invalid Request: %s:%s", query, err.Error())
-	//				w.WriteHeader(http.StatusBadRequest)
-	//				return
-	//			}
-	//		}
-	//	case "POST":
-	//		decoder := json.NewDecoder(r.Body)
-	//		if nil != decoder {
-	//			err := decoder.Decode(&reqObject)
-	//			if err != nil {
-	//				logger.Error("Invalid Request: %s", err.Error())
-	//				w.WriteHeader(http.StatusBadRequest)
-	//				return
-	//			}
-	//		}
-	//	}
+func updateStat() {
+	ticker := time.NewTicker(time.Second * (time.Duration)(*config.RefreshInterval))
+	var sMap []map[string]int64
+	sMap[0] = make(map[string]int64)
+	sMapIdx := 0
+	for {
+		select {
+		case pairs := <-msgChan:
+			for _, pair := range pairs {
+				if val, found := sMap[sMapIdx][pair.Key]; !found {
+					sMap[sMapIdx][pair.Key] = pair.Value
+				} else {
+					sMap[sMapIdx][pair.Key] = val + pair.Value
+				}
+			}
+		case <-ticker.C:
+			for _, wrtr := range writers {
+				go wrtr.Write(sMap[sMapIdx])
+			}
+			if 0 == sMapIdx {
+				sMapIdx = 1
+			} else {
+				sMapIdx = 0
+			}
+			sMap[sMapIdx] = make(map[string]int64)
+		}
+	}
+}
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		//		query := r.FormValue("query")
+		//		logger.Debug("request data is: %s", query)
+		//		if !util.IsBlank(query) {
+		//			err := json.Unmarshal([]byte(query), &reqObject)
+		//			if nil != err {
+		//				logger.Error("Invalid Request: %s:%s", query, err.Error())
+		//				w.WriteHeader(http.StatusBadRequest)
+		//				return
+		//			}
+		//		}
+		w.WriteHeader(http.StatusBadRequest)
+	case "POST":
+		req := data.Request{}
+		decoder := json.NewDecoder(r.Body)
+		if nil != decoder {
+			err := decoder.Decode(&req)
+			if err != nil {
+				llog.Error("Invalid Request: %s", err.Error())
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			msgChan <- req.Pairs
+		}
+	}
 }
 
 func main() {

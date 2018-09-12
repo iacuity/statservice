@@ -11,6 +11,8 @@
  		"Name": "statservice",
  		"Path": "/iacuity/stat"
  	}],
+	"RefreshInterval": 60,
+	"DataDirectory": "/usr/local/iacuity/statservice/data"
  	"DBConfig": {
  		"Hostname": "localhost",
  		"Port": 3306,

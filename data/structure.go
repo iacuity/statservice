@@ -14,10 +14,12 @@ type Request struct {
 }
 
 type Config struct {
-	LogConfig    *LogConfig
-	ServerConfig *ServerConfig
-	Servlets     []*ServletConfig
-	DBConfig     *DBConfig
+	LogConfig       *LogConfig
+	ServerConfig    *ServerConfig
+	Servlets        []*ServletConfig
+	RefreshInterval *int
+	DataDirectory   *string
+	DBConfig        *DBConfig
 }
 
 type LogConfig struct {

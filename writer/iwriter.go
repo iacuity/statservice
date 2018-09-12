@@ -1,5 +1,5 @@
 package writer
 
 type IWritter interface {
-	write() error
+	Write(map[string]int64) error
 }
