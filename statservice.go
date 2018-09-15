@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,9 +21,8 @@ const (
 )
 
 var (
-	config   data.Config
-	msqlConn *sql.DB
-	msgChan  chan []data.Pair
+	config  data.Config
+	msgChan chan []data.Pair
 
 	writers = []writer.IWritter{
 		&writer.FileWriter{},
@@ -49,11 +47,12 @@ func init() {
 	llog.SetLogLevel(llog.LogLevel(*config.LogConfig.LogLevel))
 	llog.Info("Read configuration success. configuration is: %s", config.String())
 	llog.Debug("Initializing Stat Service...")
-
 	var err error
-	if msqlConn, err = util.GetSQLConnection(config.DBConfig); nil != err {
-		llog.Error("Failed to connect mysql server:%s", err.Error())
-		os.Exit(1)
+	for _, wrtr := range writers {
+		if err = wrtr.Init(&config); nil != err {
+			llog.Error("Failed to initialize writter:%s", err.Error())
+			os.Exit(1)
+		}
 	}
 
 	llog.Info("Register service access handler...")
@@ -70,9 +69,9 @@ func init() {
 
 func updateStat() {
 	ticker := time.NewTicker(time.Second * (time.Duration)(*config.RefreshInterval))
-	var sMap []map[string]int64
+	var sMap [2]map[string]int64
 	sMap[0] = make(map[string]int64)
-	sMapIdx := 0
+	var sMapIdx uint8 = 0
 	for {
 		select {
 		case pairs := <-msgChan:
@@ -87,12 +86,8 @@ func updateStat() {
 			for _, wrtr := range writers {
 				go wrtr.Write(sMap[sMapIdx])
 			}
-			if 0 == sMapIdx {
-				sMapIdx = 1
-			} else {
-				sMapIdx = 0
-			}
-			sMap[sMapIdx] = make(map[string]int64)
+			sMap[sMapIdx^1] = make(map[string]int64)
+			sMapIdx ^= 1
 		}
 	}
 }
