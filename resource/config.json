@@ -5,14 +5,14 @@
  	},
  	"ServerConfig": {
  		"Host": "",
- 		"Port": 4040
+ 		"Port": 2471
  	},
  	"Servlets": [{
  		"Name": "statservice",
  		"Path": "/iacuity/stat"
  	}],
 	"RefreshInterval": 60,
-	"DataDirectory": "/usr/local/iacuity/statservice/data"
+	"DataDirectory": "/usr/local/iacuity/statservice/data",
  	"DBConfig": {
  		"Hostname": "localhost",
  		"Port": 3306,

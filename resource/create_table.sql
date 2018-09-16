@@ -1,9 +1,11 @@
-CREATE TABLE IF NOT EXISTS tracker_impression(
+USE statdb;
+
+CREATE TABLE IF NOT EXISTS stat_metric(
     timestamp           DATETIME    NOT NULL,
-    key                 CHAR(255)   NOT NULL,
+    metric              CHAR(255)   NOT NULL,
     value               BIGINT      NOT NULL,
     last_update         DATETIME    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY(timestamp, key)
+    PRIMARY KEY(timestamp, metric)
 )ENGINE = INNODB CHARACTER SET=utf8
  PARTITION BY RANGE( MONTH(timestamp) ) (
     PARTITION p1_jan VALUES LESS THAN (2),

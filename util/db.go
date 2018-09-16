@@ -18,8 +18,8 @@ const (
 // return routine safe connection pool object
 func GetSQLConnection(conf *data.DBConfig) (*sql.DB, error) {
 	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%d)/%s", conf.Username, conf.Password,
-		conf.Hostname, conf.Port, conf.Database)
+		"%s:%s@tcp(%s:%d)/%s", *conf.Username, *conf.Password,
+		*conf.Hostname, *conf.Port, *conf.Database)
 
 	llog.Debug("DATABASE CONFIG: %s", conf.String())
 	llog.Debug("DATABASE DSN: %s", dsn)
