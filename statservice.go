@@ -64,7 +64,7 @@ func init() {
 	}
 
 	msgChan = make(chan []data.Pair, MAX_CHANNEL_BUFFER)
-	updateStat()
+	go updateStat()
 }
 
 func updateStat() {
@@ -123,7 +123,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	llog.Info("Starting adserver...")
+	llog.Info("Starting stat service...")
 	addr := fmt.Sprintf("%s:%d", *config.ServerConfig.Host,
 		*config.ServerConfig.Port)
 	http.ListenAndServe(addr, nil)
