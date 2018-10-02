@@ -44,6 +44,11 @@ func (w *MySQLWriter) Write(sMap map[string]int64) error {
 		params = append(params, key)
 		params = append(params, val)
 	}
+
+	if len(params) <= 0 {
+		return nil
+	}
+
 	buffer.WriteString(strings.Join(values, ","))
 	stmt, err := msqlConn.Prepare(buffer.String())
 	if nil != err {
