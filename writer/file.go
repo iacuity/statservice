@@ -83,10 +83,10 @@ func (w *FileWriter) Init(config *data.Config) error {
 
 func (w *FileWriter) Write(sMap map[string]int64) error {
 	for key, val := range sMap {
-		if fval, found := fsMap[key]; found {
-			fsMap[key] = fval + val
-		} else {
+		if fval, found := fsMap[key]; !found {
 			fsMap[key] = val
+		} else {
+			fsMap[key] = fval + val
 		}
 	}
 
