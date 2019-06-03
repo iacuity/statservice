@@ -5,8 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/llog"
@@ -17,20 +19,21 @@ import (
 )
 
 const (
-	MAX_CHANNEL_BUFFER = 100000
+	MAX_CHANNEL_BUFFER = 1000000
 )
 
 var (
-	config  data.Config
-	msgChan chan []data.Pair
-
-	writers = []writer.IWritter{
+	config         data.Config
+	maxMsgChannels = runtime.NumCPU()
+	msgChan        = make([]chan []data.Pair, maxMsgChannels)
+	writers        = []writer.IWritter{
 		&writer.FileWriter{},
 		&writer.MySQLWriter{},
 	}
 )
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	configFile := flag.String("config", "", "Stat Service Configuration File")
 	flag.Parse()
 
@@ -63,31 +66,60 @@ func init() {
 		}
 	}
 
-	msgChan = make(chan []data.Pair, MAX_CHANNEL_BUFFER)
+	for i := 0; i < maxMsgChannels; i++ {
+		msgChan[i] = make(chan []data.Pair, MAX_CHANNEL_BUFFER)
+	}
 	go updateStat()
 }
 
 func updateStat() {
-	ticker := time.NewTicker(time.Second * (time.Duration)(*config.RefreshInterval))
-	var sMap [2]map[string]int64
-	sMap[0] = make(map[string]int64)
-	var sMapIdx uint8 = 0
-	for {
-		select {
-		case pairs := <-msgChan:
-			for _, pair := range pairs {
-				if val, found := sMap[sMapIdx][pair.Key]; !found {
-					sMap[sMapIdx][pair.Key] = pair.Value
-				} else {
-					sMap[sMapIdx][pair.Key] = val + pair.Value
+	sMapChan := make(chan map[string]int64)
+	for i := 0; i < maxMsgChannels; i++ {
+		go func(i int) {
+			ticker := time.NewTicker(time.Second * (time.Duration)(*config.RefreshInterval))
+			var sMap [2]map[string]int64
+			sMap[0] = make(map[string]int64)
+			var sMapIdx uint8 = 0
+			for {
+				select {
+				case pairs := <-msgChan[i]:
+					for _, pair := range pairs {
+						if val, found := sMap[sMapIdx][pair.Key]; !found {
+							sMap[sMapIdx][pair.Key] = pair.Value
+						} else {
+							sMap[sMapIdx][pair.Key] = val + pair.Value
+						}
+					}
+				case <-ticker.C:
+					sMapChan <- sMap[sMapIdx]
+					sMap[sMapIdx^1] = make(map[string]int64)
+					sMapIdx ^= 1
 				}
 			}
-		case <-ticker.C:
-			for _, wrtr := range writers {
-				go wrtr.Write(sMap[sMapIdx])
+		}(i)
+	}
+	sMapArray := make([]map[string]int64, 0)
+
+	for {
+		select {
+		case sMap := <-sMapChan:
+			sMapArray = append(sMapArray, sMap)
+			if maxMsgChannels == len(sMapArray) {
+				aggSMap := make(map[string]int64)
+				for _, sMapEle := range sMapArray {
+					for key, value := range sMapEle {
+						if val, found := aggSMap[key]; !found {
+							aggSMap[key] = value
+						} else {
+							aggSMap[key] = val + value
+						}
+					}
+				}
+				for _, wrtr := range writers {
+					go wrtr.Write(aggSMap)
+				}
+				sMapArray = make([]map[string]int64, 0)
 			}
-			sMap[sMapIdx^1] = make(map[string]int64)
-			sMapIdx ^= 1
 		}
 	}
 }
@@ -117,7 +149,9 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			msgChan <- req.Pairs
+			rNum := rand.Intn(maxMsgChannels) % maxMsgChannels
+			msgChan[rNum] <- req.Pairs
+			llog.Debug("Data Come :%v", msgChan[0])
 		}
 	}
 }
